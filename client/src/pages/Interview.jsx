@@ -177,7 +177,10 @@ export const Interview = () => {
       setPhase('interview');
     } else {
       // Finished all 5 questions -> Calculate Final Report
-      const report = interviewService.calculateReport(answersHistory);
+      const historyToUse = answersHistory.length >= questions.length
+        ? answersHistory
+        : (currentFeedback ? [...answersHistory, { question: currentQ, answer: userAnswer, feedback: currentFeedback }] : answersHistory);
+      const report = interviewService.calculateReport(historyToUse);
       setFinalReport(report);
       setPhase('report');
       toast.success('Interview complete! Your report card is ready.');

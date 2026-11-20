@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import html2pdf from 'html2pdf.js';
 import {
   FileText,
   Sparkles,
@@ -253,6 +252,8 @@ export const ResumeBuilder = () => {
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
       };
 
+      const html2pdfModule = await import('html2pdf.js');
+      const html2pdf = html2pdfModule.default || html2pdfModule;
       await html2pdf().set(opt).from(previewRef.current).save();
       toast.success('Resume downloaded successfully!', { id: toastId });
     } catch (error) {
