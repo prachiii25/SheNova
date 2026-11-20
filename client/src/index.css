@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight text-ink;
+  }
+  
+  body {
+    @apply bg-surface text-ink;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FAF9FC;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #DECFF0;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C2A7E4;
+}
