@@ -32,10 +32,12 @@ import {
 } from '../components/ui';
 
 import { useAuth } from '../hooks/useAuth';
+import { learningService } from '../services/learningService';
 
 export const Learning = () => {
   const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isDemoMode, setIsDemoMode] = useState(true);
 
   // Courses state with localStorage persistence
   const [courses, setCourses] = useState(() => {
@@ -156,28 +158,65 @@ export const Learning = () => {
     ];
   });
 
+  // Load from backend API if available
+  useEffect(() => {
+    const fetchCoursesFromApi = async () => {
+      try {
+        const res = await learningService.getCourses();
+        if (res?.courses?.length > 0) {
+          const mapped = res.courses.map((c) => ({
+            id: c.courseId || c.id,
+            title: c.title,
+            category: c.category,
+            level: c.level,
+            duration: c.duration,
+            progress: c.userProgress || 0,
+            provider: c.provider,
+            isRecommendedGap: c.isRecommendedGap,
+            description: c.description,
+          }));
+          setCourses(mapped);
+          setIsDemoMode(Boolean(res.demoMode));
+        }
+      } catch (err) {
+        console.warn('Learning API fetch error:', err);
+      }
+    };
+    fetchCoursesFromApi();
+  }, []);
+
   // Save progress changes
   useEffect(() => {
     localStorage.setItem('shenova_courses_progress', JSON.stringify(courses));
   }, [courses]);
 
   // Handle Progress Increment
-  const handleUpdateProgress = (courseId) => {
+  const handleUpdateProgress = async (courseId) => {
+    let nextProgress = 0;
+    let courseTitle = '';
+
     setCourses((prev) =>
       prev.map((c) => {
         if (c.id === courseId) {
-          let nextProgress = c.progress + 35;
-          if (nextProgress >= 100) {
-            nextProgress = 100;
-            toast.success(`🎉 Congratulations! You completed "${c.title}"!`);
-          } else {
-            toast.success(`Progress saved! Advanced to ${nextProgress}%.`);
-          }
+          nextProgress = Math.min(100, c.progress + 35);
+          courseTitle = c.title;
           return { ...c, progress: nextProgress };
         }
         return c;
       })
     );
+
+    if (nextProgress >= 100) {
+      toast.success(`🎉 Congratulations! You completed "${courseTitle}"!`);
+    } else {
+      toast.success(`Progress saved! Advanced to ${nextProgress}%.`);
+    }
+
+    try {
+      await learningService.updateCourseProgress(courseId, nextProgress);
+    } catch (err) {
+      // Local state is already updated
+    }
   };
 
   // Beginner-friendly learning tracks

@@ -57,6 +57,8 @@ export const Interview = () => {
     user?.targetRole || 'Senior Product Manager'
   );
   const [selectedDifficulty, setSelectedDifficulty] = useState('standard');
+  const [sessionId, setSessionId] = useState(null);
+  const [isDemoMode, setIsDemoMode] = useState(true);
 
   // Interview Questions & Answers
   const [questions, setQuestions] = useState([]);
@@ -102,7 +104,10 @@ export const Interview = () => {
         selectedRole,
         selectedDifficulty
       );
-      setQuestions(generated);
+      const qList = Array.isArray(generated) ? generated : generated.questions || [];
+      setSessionId(generated.sessionId || null);
+      setIsDemoMode(Boolean(generated.demoMode));
+      setQuestions(qList);
       setCurrentIndex(0);
       setUserAnswer('');
       setAnswersHistory([]);
@@ -133,9 +138,15 @@ export const Interview = () => {
       const feedback = await interviewService.evaluateAnswer({
         question: currentQ.question,
         answer: userAnswer,
+        questionIndex: currentIndex,
+        sessionId,
         role: selectedRole,
         difficulty: selectedDifficulty,
       });
+
+      if (feedback?.demoMode !== undefined) {
+        setIsDemoMode(feedback.demoMode);
+      }
 
       const entry = {
         question: currentQ,

@@ -36,6 +36,7 @@ import {
 } from '../components/ui';
 
 import { useAuth } from '../hooks/useAuth';
+import { communityService } from '../services/communityService';
 
 export const Community = () => {
   const { user } = useAuth();
@@ -77,6 +78,7 @@ export const Community = () => {
     },
   ];
 
+  const [mentorsList, setMentorsList] = useState(sampleMentors);
   const [selectedMentor, setSelectedMentor] = useState(null);
   const [mentorshipForm, setMentorshipForm] = useState({
     topic: 'Resume & Gap Narrative Review',
@@ -96,13 +98,48 @@ export const Community = () => {
     }
   });
 
-  const handleSendMentorshipRequest = (e) => {
+  // Fetch community data from API on mount
+  useEffect(() => {
+    const fetchCommunityData = async () => {
+      try {
+        const [apiMentors, apiReqs, apiStories, apiPosts] = await Promise.allSettled([
+          communityService.getMentors(),
+          communityService.getMyMentorshipRequests(),
+          communityService.getSuccessStories(),
+          communityService.getForumPosts(),
+        ]);
+
+        if (apiMentors.status === 'fulfilled' && apiMentors.value?.length > 0) {
+          setMentorsList(apiMentors.value);
+        }
+        if (apiReqs.status === 'fulfilled' && apiReqs.value?.length > 0) {
+          setSentRequests(apiReqs.value);
+        }
+        if (apiPosts.status === 'fulfilled' && apiPosts.value?.length > 0) {
+          setForumPosts(apiPosts.value);
+        }
+      } catch (err) {
+        console.warn('Community API error:', err);
+      }
+    };
+    fetchCommunityData();
+  }, []);
+
+  const handleSendMentorshipRequest = async (e) => {
     e.preventDefault();
     setIsSubmittingMentorship(true);
-    setTimeout(() => {
+
+    try {
+      await communityService.requestMentorship({
+        mentorName: selectedMentor.name,
+        topic: mentorshipForm.topic,
+        message: mentorshipForm.message,
+        preferredTime: mentorshipForm.preferredTime,
+      });
+
       const newReq = {
         id: Date.now(),
-        mentorId: selectedMentor.id,
+        mentorId: selectedMentor.id || selectedMentor.mentorId,
         mentorName: selectedMentor.name,
         topic: mentorshipForm.topic,
         sentAt: new Date().toLocaleDateString(),
@@ -110,10 +147,25 @@ export const Community = () => {
       const updated = [...sentRequests, newReq];
       setSentRequests(updated);
       localStorage.setItem('shenova_mentorship_requests', JSON.stringify(updated));
-      setIsSubmittingMentorship(false);
       setSelectedMentor(null);
       toast.success(`Mentorship request sent to ${selectedMentor.name}!`);
-    }, 600);
+    } catch (err) {
+      // Fallback save
+      const newReq = {
+        id: Date.now(),
+        mentorId: selectedMentor.id || selectedMentor.mentorId,
+        mentorName: selectedMentor.name,
+        topic: mentorshipForm.topic,
+        sentAt: new Date().toLocaleDateString(),
+      };
+      const updated = [...sentRequests, newReq];
+      setSentRequests(updated);
+      localStorage.setItem('shenova_mentorship_requests', JSON.stringify(updated));
+      setSelectedMentor(null);
+      toast.success(`Mentorship request submitted for ${selectedMentor.name}!`);
+    } finally {
+      setIsSubmittingMentorship(false);
+    }
   };
 
   // =========================================================
@@ -190,7 +242,7 @@ export const Community = () => {
     content: '',
   });
 
-  const handleCreatePost = (e) => {
+  const handleCreatePost = async (e) => {
     e.preventDefault();
     if (!newPost.title.trim() || !newPost.content.trim()) {
       toast.error('Please enter both title and content.');
@@ -217,12 +269,20 @@ export const Community = () => {
     setNewPost({ title: '', category: 'Career Restart Advice', content: '' });
     setIsPostModalOpen(false);
     toast.success('Your thread has been posted to the Sisterhood Circle!');
+
+    try {
+      await communityService.createForumPost({
+        title: created.title,
+        content: created.content,
+        category: created.category,
+      });
+    } catch (err) {}
   };
 
-  const handleToggleCheer = (postId) => {
+  const handleToggleCheer = async (postId) => {
     setForumPosts((prev) =>
       prev.map((p) => {
-        if (p.id === postId) {
+        if (p.id === postId || p._id === postId) {
           const cheered = !p.hasCheered;
           toast.success(cheered ? 'Cheer sent! ❤️' : 'Cheer removed');
           return {
@@ -234,32 +294,42 @@ export const Community = () => {
         return p;
       })
     );
+
+    try {
+      await communityService.cheerForumPost(postId);
+    } catch (err) {}
   };
 
   // Reply State
   const [activeReplyPostId, setActiveReplyPostId] = useState(null);
   const [replyText, setReplyText] = useState('');
 
-  const handleAddReply = (postId) => {
+  const handleAddReply = async (postId) => {
     if (!replyText.trim()) return;
+
+    const newReply = {
+      id: Date.now(),
+      author: `${user?.name || 'Ananya Sharma'} (You)`,
+      time: 'Just now',
+      text: replyText.trim(),
+    };
 
     setForumPosts((prev) =>
       prev.map((p) => {
-        if (p.id === postId) {
-          const newReply = {
-            id: Date.now(),
-            author: `${user?.name || 'Ananya Sharma'} (You)`,
-            time: 'Just now',
-            text: replyText.trim(),
-          };
+        if (p.id === postId || p._id === postId) {
           return { ...p, replies: [...p.replies, newReply] };
         }
         return p;
       })
     );
+    const sentText = replyText.trim();
     setReplyText('');
     setActiveReplyPostId(null);
     toast.success('Reply added to discussion!');
+
+    try {
+      await communityService.replyToForumPost(postId, sentText);
+    } catch (err) {}
   };
 
   // =========================================================

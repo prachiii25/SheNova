@@ -32,6 +32,7 @@ import {
 } from '../components/ui';
 
 import { useAuth } from '../hooks/useAuth';
+import { authService } from '../services/authService';
 
 export const Profile = () => {
   const { user, setUser } = useAuth();
@@ -65,7 +66,7 @@ export const Profile = () => {
     weeklyHours: user?.weeklyHours || '8 - 10 hours/week',
   });
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       toast.error('Name cannot be empty.');
@@ -73,8 +74,28 @@ export const Profile = () => {
     }
 
     setIsSaving(true);
-    setTimeout(() => {
-      const updatedUser = {
+    try {
+      const updatedUser = await authService.updateProfile({
+        name: formData.name.trim(),
+        phone: formData.phone,
+        location: formData.location,
+        avatar: formData.avatar,
+        bio: formData.bio,
+        careerBreak: {
+          reason: formData.breakReason,
+          duration: formData.breakDuration,
+          previousRole: formData.priorRole,
+          targetRole: formData.targetRole,
+          workPreference: formData.preferredWorkType,
+          weeklyHours: formData.weeklyHours,
+        },
+      });
+
+      setUser(updatedUser);
+      toast.success('Returner profile preferences saved successfully!');
+    } catch (err) {
+      // Fallback local update
+      const localUpdated = {
         ...user,
         name: formData.name.trim(),
         phone: formData.phone,
@@ -88,13 +109,12 @@ export const Profile = () => {
         preferredWorkType: formData.preferredWorkType,
         weeklyHours: formData.weeklyHours,
       };
-
-      setUser(updatedUser);
-      localStorage.setItem('shenova_demo_user', JSON.stringify(updatedUser));
-      localStorage.setItem('shenova_auth_user', JSON.stringify(updatedUser));
+      setUser(localUpdated);
+      localStorage.setItem('shenova_auth_user', JSON.stringify(localUpdated));
+      toast.success('Profile preferences saved locally!');
+    } finally {
       setIsSaving(false);
-      toast.success('Returner profile preferences saved successfully!');
-    }, 550);
+    }
   };
 
   return (

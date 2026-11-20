@@ -216,7 +216,7 @@ export const SkillGap = () => {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {analysisResult.skillsComparison.map((item, idx) => (
+                {(analysisResult.skillsComparison || []).map((item, idx) => (
                   <div
                     key={idx}
                     className="p-3.5 rounded-xl bg-surface-subtle border border-surface-border space-y-2"
@@ -273,24 +273,24 @@ export const SkillGap = () => {
               </CardHeader>
 
               <CardContent className="space-y-3.5">
-                {analysisResult.flaggedGaps.map((gap, i) => (
+                {(analysisResult.flaggedGaps || analysisResult.flaggedOutdatedSkills || []).map((gap, i) => (
                   <div
                     key={i}
                     className="p-3.5 rounded-xl border border-surface-border bg-white shadow-soft-sm space-y-2"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-heading font-bold text-xs text-ink">{gap.skill}</span>
+                      <span className="font-heading font-bold text-xs text-ink">{gap.skill || gap.legacy}</span>
                       <Badge
                         variant={gap.severity === 'High' ? 'primary' : 'secondary'}
                         size="sm"
                       >
-                        {gap.type}
+                        {gap.type || 'Tooling Shift'}
                       </Badge>
                     </div>
                     <p className="text-[11px] text-ink-muted leading-relaxed">{gap.reason}</p>
                     <div className="pt-2 border-t border-surface-border/50 text-[11px] text-primary-700 font-semibold flex items-center gap-1.5">
                       <Zap className="w-3.5 h-3.5 text-accent-500" />
-                      <span>{gap.action}</span>
+                      <span>{gap.action || gap.modernReplacement || 'Updated standard in 2026'}</span>
                     </div>
                   </div>
                 ))}
@@ -320,23 +320,23 @@ export const SkillGap = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {analysisResult.recommendedCourses.map((course) => (
-                <Card key={course.id} isHoverable className="flex flex-col justify-between">
+              {(analysisResult.recommendedCourses || []).map((course, idx) => (
+                <Card key={course.id || idx} isHoverable className="flex flex-col justify-between">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Badge variant="outline" size="sm">
-                        {course.duration}
+                        {course.duration || '2.0 Hours'}
                       </Badge>
                       <Badge
-                        variant={course.level.includes('High') ? 'primary' : 'secondary'}
+                        variant={(course.level || '').includes('High') ? 'primary' : 'secondary'}
                         size="sm"
                       >
-                        {course.level}
+                        {course.level || 'Recommended'}
                       </Badge>
                     </div>
                     <h4 className="font-heading font-bold text-sm text-ink">{course.title}</h4>
-                    <p className="text-xs text-primary-700 font-medium">{course.provider}</p>
-                    <span className="text-[11px] text-ink-muted block">{course.format}</span>
+                    <p className="text-xs text-primary-700 font-medium">{course.provider || 'SheNova Hub'}</p>
+                    <span className="text-[11px] text-ink-muted block">{course.format || course.focus || 'Micro-Sprint'}</span>
                   </div>
 
                   <div className="pt-3 mt-3 border-t border-surface-border/60">
@@ -371,7 +371,7 @@ export const SkillGap = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {analysisResult.stepByStepUpskillingPlan.map((phase, idx) => (
+                {(analysisResult.stepByStepUpskillingPlan || analysisResult.upskillingPlan || []).map((phase, idx) => (
                   <div
                     key={idx}
                     className="p-4 rounded-2xl bg-surface-subtle border border-surface-border flex flex-col justify-between space-y-3"
@@ -381,13 +381,13 @@ export const SkillGap = () => {
                         <span className="text-[11px] font-bold uppercase tracking-wider text-primary-700 font-heading">
                           Phase {idx + 1}
                         </span>
-                        <span className="text-xs font-semibold text-ink-muted">{phase.timeEstimate}</span>
+                        <span className="text-xs font-semibold text-ink-muted">{phase.timeEstimate || phase.week || phase.hours}</span>
                       </div>
-                      <h4 className="font-heading font-bold text-sm text-ink">{phase.phase}</h4>
-                      <p className="text-xs text-primary-800 font-medium">{phase.focus}</p>
+                      <h4 className="font-heading font-bold text-sm text-ink">{phase.phase || phase.title}</h4>
+                      <p className="text-xs text-primary-800 font-medium">{phase.focus || phase.milestone}</p>
 
                       <ul className="space-y-1.5 pt-2 text-xs text-ink-light">
-                        {phase.items.map((item, i) => (
+                        {(phase.items || (phase.milestone ? [phase.milestone] : [])).map((item, i) => (
                           <li key={i} className="flex items-start gap-2">
                             <CheckCircle2 className="w-3.5 h-3.5 text-primary-600 shrink-0 mt-0.5" />
                             <span>{item}</span>

@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { devUsers } from '../controllers/authController.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -31,7 +32,7 @@ export const protect = async (req, res, next) => {
       user = await User.findById(decoded.id);
     } catch (dbErr) {
       if (process.env.NODE_ENV === 'development') {
-        user = {
+        user = devUsers.get(decoded.id) || {
           _id: decoded.id || '673e515d6c8b9123456789ab',
           name: 'Ananya Sharma',
           email: 'ananya.sharma@example.com',
@@ -45,7 +46,7 @@ export const protect = async (req, res, next) => {
 
     if (!user) {
       if (process.env.NODE_ENV === 'development') {
-        user = {
+        user = devUsers.get(decoded.id) || {
           _id: decoded.id || '673e515d6c8b9123456789ab',
           name: 'Ananya Sharma',
           email: 'ananya.sharma@example.com',

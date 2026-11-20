@@ -161,6 +161,7 @@ export const Roadmap = () => {
     const updatedRoadmap = { ...roadmapData, milestones: updatedMilestones };
     setRoadmapData(updatedRoadmap);
     roadmapService.saveRoadmap(updatedRoadmap);
+    roadmapService.toggleMilestone(milestoneId, updatedMilestones.find(m => m.id === milestoneId)?.status === 'completed');
     toast.success('Roadmap milestone task updated!');
   };
 

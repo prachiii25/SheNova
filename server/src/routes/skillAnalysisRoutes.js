@@ -11,5 +11,6 @@ router.use(protect);
 
 router.get('/', getSkillAnalyses);
 router.post('/', createSkillAnalysis);
+router.post('/analyze', createSkillAnalysis);
 
 export default router;

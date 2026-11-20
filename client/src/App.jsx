@@ -1,26 +1,36 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { Spinner } from './components/ui';
 
 // Layouts
 import PublicLayout from './components/layout/PublicLayout';
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
-// Pages
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import ForgotPassword from './pages/ForgotPassword';
-import Dashboard from './pages/Dashboard';
-import Roadmap from './pages/Roadmap';
-import SkillGap from './pages/SkillGap';
-import ResumeBuilder from './pages/ResumeBuilder';
-import Jobs from './pages/Jobs';
-import Interview from './pages/Interview';
-import Learning from './pages/Learning';
-import Community from './pages/Community';
-import Profile from './pages/Profile';
+// Lazy-loaded Pages for optimized bundle splitting & faster page loads
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Roadmap = lazy(() => import('./pages/Roadmap'));
+const SkillGap = lazy(() => import('./pages/SkillGap'));
+const ResumeBuilder = lazy(() => import('./pages/ResumeBuilder'));
+const Jobs = lazy(() => import('./pages/Jobs'));
+const Interview = lazy(() => import('./pages/Interview'));
+const Learning = lazy(() => import('./pages/Learning'));
+const Community = lazy(() => import('./pages/Community'));
+const Profile = lazy(() => import('./pages/Profile'));
+
+const PageFallback = () => (
+  <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 p-8 animate-fadeIn">
+    <Spinner size="lg" variant="primary" />
+    <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider font-heading">
+      Loading view...
+    </span>
+  </div>
+);
 
 export function App() {
   return (
@@ -53,38 +63,40 @@ export function App() {
         }}
       />
 
-      <Routes>
-        {/* Public Routes with Navbar & Footer */}
-        <Route element={<PublicLayout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-        </Route>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          {/* Public Routes with Navbar & Footer */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+          </Route>
 
-        {/* Protected Authenticated Workspace Routes */}
-        <Route
-          element={
-            <ProtectedRoute>
-              <AppLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/roadmap" element={<Roadmap />} />
-          <Route path="/skill-gap" element={<SkillGap />} />
-          <Route path="/resume-builder" element={<ResumeBuilder />} />
-          <Route path="/resume" element={<ResumeBuilder />} />
-          <Route path="/jobs" element={<Jobs />} />
-          <Route path="/interview" element={<Interview />} />
-          <Route path="/learning" element={<Learning />} />
-          <Route path="/community" element={<Community />} />
-          <Route path="/profile" element={<Profile />} />
-        </Route>
+          {/* Protected Authenticated Workspace Routes */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/roadmap" element={<Roadmap />} />
+            <Route path="/skill-gap" element={<SkillGap />} />
+            <Route path="/resume-builder" element={<ResumeBuilder />} />
+            <Route path="/resume" element={<ResumeBuilder />} />
+            <Route path="/jobs" element={<Jobs />} />
+            <Route path="/interview" element={<Interview />} />
+            <Route path="/learning" element={<Learning />} />
+            <Route path="/community" element={<Community />} />
+            <Route path="/profile" element={<Profile />} />
+          </Route>
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </>
   );
 }

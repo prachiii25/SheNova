@@ -42,6 +42,7 @@ import {
 
 // Context & Data
 import { useAuth } from '../hooks/useAuth';
+import { dashboardService } from '../services/dashboardService';
 import {
   DEMO_USER,
   DEMO_CAREER_PROGRESS_STEPS,
@@ -59,14 +60,33 @@ export const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isNewUserView, setIsNewUserView] = useState(false);
   const [isCheckinModalOpen, setIsCheckinModalOpen] = useState(false);
-  const [readinessScore, setReadinessScore] = useState(DEMO_USER.readinessScore || 78);
+  const [readinessScore, setReadinessScore] = useState(user?.progress?.readinessScore || 78);
 
-  // Simulate smooth initial data fetch
+  const [careerProgressSteps, setCareerProgressSteps] = useState(DEMO_CAREER_PROGRESS_STEPS);
+  const [resumeMetrics, setResumeMetrics] = useState(DEMO_RESUME_METRICS);
+  const [recommendedJobs, setRecommendedJobs] = useState(DEMO_JOBS);
+
+  // Fetch live dashboard state on mount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 450);
-    return () => clearTimeout(timer);
+    const fetchDashboardState = async () => {
+      try {
+        const data = await dashboardService.getDashboardData();
+        if (data.careerProgressSteps) {
+          setCareerProgressSteps(data.careerProgressSteps);
+        }
+        if (data.resume) {
+          setResumeMetrics(data.resume);
+        }
+        if (data.recommendedJobs?.length > 0) {
+          setRecommendedJobs(data.recommendedJobs);
+        }
+      } catch (err) {
+        console.warn('Dashboard fetch error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchDashboardState();
   }, []);
 
   const handleSimulateCheckin = (delta) => {
@@ -250,7 +270,7 @@ export const Dashboard = () => {
                 Active Returner Track
               </Badge>
               <span className="text-xs text-primary-100 font-medium">
-                Targeting: <strong className="text-white">{user?.targetRole || DEMO_USER.title}</strong>
+                Targeting: <strong className="text-white">{user?.careerBreak?.targetRole || user?.targetRole || DEMO_USER.title}</strong>
               </span>
             </div>
 
@@ -259,7 +279,7 @@ export const Dashboard = () => {
             </h1>
 
             <p className="text-primary-100 text-xs sm:text-sm leading-relaxed">
-              Your {user?.breakDuration || DEMO_USER.careerBreak.duration} career pause is an asset of executive resilience. You are currently <strong>78% ready</strong> to step back into senior leadership returnships.
+              Your {user?.careerBreak?.duration || user?.breakDuration || DEMO_USER.careerBreak.duration} career pause is an asset of executive resilience. You are currently <strong>78% ready</strong> to step back into senior leadership returnships.
             </p>
           </div>
 

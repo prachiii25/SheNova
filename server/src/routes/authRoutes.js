@@ -5,6 +5,7 @@ import {
   forgotPassword,
   resetPassword,
   getMe,
+  updateProfile,
 } from '../controllers/authController.js';
 import {
   validateSignup,
@@ -21,5 +22,6 @@ router.post('/login', validateLogin, login);
 router.post('/forgot-password', validateForgotPassword, forgotPassword);
 router.post('/reset-password/:token', validateResetPassword, resetPassword);
 router.get('/me', protect, getMe);
+router.put('/profile', protect, updateProfile);
 
 export default router;

@@ -1,12 +1,39 @@
 import Course from '../models/Course.js';
 import CourseProgress from '../models/CourseProgress.js';
 import User from '../models/User.js';
+import { isDbConnected, devCourses, devCourseProgress } from '../utils/devStore.js';
 
 export const getAllCourses = async (req, res, next) => {
   try {
     const { category, recommended } = req.query;
-    const filter = {};
 
+    if (!isDbConnected()) {
+      let courses = [...devCourses];
+      if (category && category !== 'All') {
+        courses = courses.filter((c) => c.category === category);
+      }
+      if (recommended === 'true') {
+        courses = courses.filter((c) => c.isRecommendedGap);
+      }
+
+      const userId = req.user?._id?.toString?.() || req.user?._id;
+      const userProgress = userId ? (devCourseProgress.get(userId) || {}) : {};
+
+      const enriched = courses.map((c) => ({
+        ...c,
+        userProgress: userProgress[c.courseId]?.progress || 0,
+        isCompleted: userProgress[c.courseId]?.completed || false,
+      }));
+
+      return res.status(200).json({
+        success: true,
+        count: enriched.length,
+        data: enriched,
+        demoMode: true,
+      });
+    }
+
+    const filter = {};
     if (category && category !== 'All') {
       filter.category = category;
     }
@@ -16,7 +43,6 @@ export const getAllCourses = async (req, res, next) => {
 
     const courses = await Course.find(filter).sort({ courseId: 1 });
 
-    // If user is authenticated, attach their progress
     let userProgressMap = {};
     if (req.user) {
       const userProgress = await CourseProgress.find({ user: req.user._id });
@@ -51,8 +77,26 @@ export const getAllCourses = async (req, res, next) => {
 export const getCourseById = async (req, res, next) => {
   try {
     const courseId = Number(req.params.id);
-    const course = await Course.findOne({ courseId });
 
+    if (!isDbConnected()) {
+      const course = devCourses.find((c) => c.courseId === courseId);
+      if (!course) {
+        return res.status(404).json({ success: false, message: 'Course not found.' });
+      }
+      const userId = req.user?._id?.toString?.() || req.user?._id;
+      const userProgress = userId ? (devCourseProgress.get(userId) || {}) : {};
+      return res.status(200).json({
+        success: true,
+        data: {
+          ...course,
+          userProgress: userProgress[courseId]?.progress || 0,
+          isCompleted: userProgress[courseId]?.completed || false,
+        },
+        demoMode: true,
+      });
+    }
+
+    const course = await Course.findOne({ courseId });
     if (!course) {
       return res.status(404).json({ success: false, message: 'Course not found.' });
     }
@@ -83,6 +127,18 @@ export const getCourseById = async (req, res, next) => {
 
 export const getUserProgress = async (req, res, next) => {
   try {
+    if (!isDbConnected()) {
+      const userId = req.user._id?.toString?.() || req.user._id;
+      const userProgress = devCourseProgress.get(userId) || {};
+      const list = Object.values(userProgress);
+      return res.status(200).json({
+        success: true,
+        count: list.length,
+        data: list,
+        demoMode: true,
+      });
+    }
+
     const progressList = await CourseProgress.find({ user: req.user._id });
     res.status(200).json({
       success: true,
@@ -108,6 +164,28 @@ export const updateCourseProgress = async (req, res, next) => {
 
     const completed = progress === 100;
 
+    if (!isDbConnected()) {
+      const userId = req.user._id?.toString?.() || req.user._id;
+      if (!devCourseProgress.has(userId)) {
+        devCourseProgress.set(userId, {});
+      }
+      const userProgMap = devCourseProgress.get(userId);
+      const updated = {
+        courseId,
+        progress,
+        completed,
+        lastAccessed: new Date().toISOString(),
+      };
+      userProgMap[courseId] = updated;
+
+      return res.status(200).json({
+        success: true,
+        message: 'Course progress updated successfully',
+        data: updated,
+        demoMode: true,
+      });
+    }
+
     const updated = await CourseProgress.findOneAndUpdate(
       { user: req.user._id, courseId },
       {
@@ -118,7 +196,6 @@ export const updateCourseProgress = async (req, res, next) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    // Update user profile progress count
     const completedCount = await CourseProgress.countDocuments({
       user: req.user._id,
       completed: true,

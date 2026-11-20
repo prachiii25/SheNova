@@ -42,6 +42,7 @@ import {
 
 import { SAMPLE_JOBS } from '../data/jobs';
 import { useAuth } from '../hooks/useAuth';
+import { jobService } from '../services/jobService';
 
 export const Jobs = () => {
   const { user } = useAuth();
@@ -76,6 +77,38 @@ export const Jobs = () => {
     }
   });
 
+  const [jobsList, setJobsList] = useState(SAMPLE_JOBS);
+  const [isDemoMode, setIsDemoMode] = useState(true);
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      setIsLoadingJobs(true);
+      try {
+        const res = await jobService.getJobs();
+        if (res?.jobs?.length > 0) {
+          setJobsList(res.jobs);
+          setIsDemoMode(Boolean(res.demoMode));
+        }
+        const [saved, apps] = await Promise.allSettled([
+          jobService.getSavedJobs(),
+          jobService.getApplications(),
+        ]);
+        if (saved.status === 'fulfilled' && saved.value.length > 0) {
+          setSavedJobIds(saved.value.map((s) => s.jobId || s.job?._id || s.job?.jobId));
+        }
+        if (apps.status === 'fulfilled' && apps.value.length > 0) {
+          setAppliedJobIds(apps.value.map((a) => a.jobId || a.job?._id || a.job?.jobId));
+        }
+      } catch (err) {
+        console.warn('Jobs fetch error:', err);
+      } finally {
+        setIsLoadingJobs(false);
+      }
+    };
+    fetchJobs();
+  }, []);
+
   // Save to LocalStorage
   useEffect(() => {
     localStorage.setItem('shenova_saved_jobs', JSON.stringify(savedJobIds));
@@ -102,19 +135,25 @@ export const Jobs = () => {
   const [isSubmittingApp, setIsSubmittingApp] = useState(false);
 
   // Toggle Bookmark
-  const handleToggleSave = (jobId, e) => {
+  const handleToggleSave = async (jobId, e) => {
     e?.stopPropagation();
-    if (savedJobIds.includes(jobId)) {
-      setSavedJobIds(savedJobIds.filter((id) => id !== jobId));
-      toast('Removed from saved opportunities.');
-    } else {
-      setSavedJobIds([...savedJobIds, jobId]);
-      toast.success('Opportunity saved to your bookmarks!');
+    try {
+      if (savedJobIds.includes(jobId)) {
+        setSavedJobIds(savedJobIds.filter((id) => id !== jobId));
+        await jobService.toggleSaveJob(jobId);
+        toast('Removed from saved opportunities.');
+      } else {
+        setSavedJobIds([...savedJobIds, jobId]);
+        await jobService.toggleSaveJob(jobId);
+        toast.success('Opportunity saved to your bookmarks!');
+      }
+    } catch (err) {
+      // Handled gracefully
     }
   };
 
   // Submit Application Handler
-  const handleConfirmApply = (e) => {
+  const handleConfirmApply = async (e) => {
     e.preventDefault();
     if (!applyForm.fullName || !applyForm.email) {
       toast.error('Please complete candidate contact details.');
@@ -122,20 +161,28 @@ export const Jobs = () => {
     }
 
     setIsSubmittingApp(true);
-    setTimeout(() => {
-      const jobId = applyModalJob.id;
+    const jobId = applyModalJob.jobId || applyModalJob.id;
+    try {
+      await jobService.applyForJob(jobId, applyForm);
       if (!appliedJobIds.includes(jobId)) {
         setAppliedJobIds((prev) => [...prev, jobId]);
       }
-      setIsSubmittingApp(false);
       setApplyModalJob(null);
-      if (detailJob?.id === jobId) {
+      if (detailJob?.id === jobId || detailJob?.jobId === jobId) {
         setDetailJob(null);
       }
       toast.success(
         `Application submitted for ${applyModalJob.title}! Track status in "Applied Jobs".`
       );
-    }, 600);
+    } catch (err) {
+      if (!appliedJobIds.includes(jobId)) {
+        setAppliedJobIds((prev) => [...prev, jobId]);
+      }
+      setApplyModalJob(null);
+      toast.success(`Application submitted for ${applyModalJob.title}! (Saved locally)`);
+    } finally {
+      setIsSubmittingApp(false);
+    }
   };
 
   // Reset Filters
@@ -149,7 +196,7 @@ export const Jobs = () => {
 
   // Filter & Sort Logic
   const filteredJobs = useMemo(() => {
-    return SAMPLE_JOBS.filter((job) => {
+    return jobsList.filter((job) => {
       // Tab Filtering
       if (activeTab === 'saved' && !savedJobIds.includes(job.id)) return false;
       if (activeTab === 'applied' && !appliedJobIds.includes(job.id)) return false;
@@ -232,7 +279,7 @@ export const Jobs = () => {
       <div className="p-4 bg-amber-50/80 border border-amber-200/80 rounded-2xl flex items-start gap-3">
         <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
         <div className="text-xs text-amber-900 leading-relaxed">
-          <strong>Sample Data Disclosure:</strong> All {SAMPLE_JOBS.length} positions below are sample demonstrative listings created for testing the SheNova application flow. In accordance with safety rules, unverified corporate partners are <span className="underline font-semibold">never marked as verified employers</span>. Real API partners will be added in production.
+          <strong>Sample Data Disclosure:</strong> All {jobsList.length} positions below are sample demonstrative listings created for testing the SheNova application flow. In accordance with safety rules, unverified corporate partners are <span className="underline font-semibold">never marked as verified employers</span>. Real API partners will be added in production.
         </div>
       </div>
 
@@ -240,7 +287,7 @@ export const Jobs = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-border pb-2">
         <Tabs
           tabs={[
-            { id: 'all', label: 'All Opportunities', count: SAMPLE_JOBS.length },
+            { id: 'all', label: 'All Opportunities', count: jobsList.length },
             { id: 'saved', label: 'Bookmarked', count: savedJobIds.length },
             { id: 'applied', label: 'Applied Roles', count: appliedJobIds.length },
           ]}

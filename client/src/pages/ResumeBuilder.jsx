@@ -41,6 +41,7 @@ import {
 } from '../components/ui';
 
 import { useAuth } from '../hooks/useAuth';
+import { resumeService } from '../services/resumeService';
 
 export const ResumeBuilder = () => {
   const { user } = useAuth();
@@ -55,6 +56,10 @@ export const ResumeBuilder = () => {
   // AI Modal for Gap Reframing
   const [isGapModalOpen, setIsGapModalOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [aiGapLoading, setAiGapLoading] = useState(false);
+  const [aiGapDemoMode, setAiGapDemoMode] = useState(true);
+  const [fetchedGapPhrasings, setFetchedGapPhrasings] = useState([]);
 
   // Resume Form State
   const [resumeData, setResumeData] = useState(() => {
@@ -154,6 +159,55 @@ export const ResumeBuilder = () => {
     localStorage.setItem('shenova_resume_data', JSON.stringify(resumeData));
     localStorage.setItem('shenova_resume_completion', completeness.toString());
   }, [resumeData, completeness]);
+
+  // Load saved resume from backend on mount if present
+  useEffect(() => {
+    const fetchSavedResume = async () => {
+      try {
+        const saved = await resumeService.getResume();
+        if (saved && saved.personal) {
+          setResumeData(saved);
+        }
+      } catch (err) {}
+    };
+    fetchSavedResume();
+  }, []);
+
+  const handleSaveResume = async () => {
+    setIsSaving(true);
+    try {
+      await resumeService.saveResume({
+        ...resumeData,
+        completeness,
+      });
+      toast.success('Resume saved to your SheNova account!');
+    } catch (err) {
+      toast.error('Failed to save resume. Saved to local storage.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleOpenGapModal = async () => {
+    setIsGapModalOpen(true);
+    setAiGapLoading(true);
+    try {
+      const res = await resumeService.explainCareerGap({
+        reason: resumeData.careerGap?.reason || user?.careerBreakReason || 'Childcare',
+        duration: resumeData.careerGap?.dates || user?.breakDuration || '3.5 years',
+        priorRole: resumeData.experience?.[0]?.role || 'Professional',
+        targetRole: resumeData.personal?.targetTitle || 'Senior Role',
+      });
+      if (res?.phrasings) {
+        setFetchedGapPhrasings(res.phrasings);
+        setAiGapDemoMode(Boolean(res.demoMode));
+      }
+    } catch (err) {
+      console.warn('AI Gap fetch error:', err);
+    } finally {
+      setAiGapLoading(false);
+    }
+  };
 
   // AI Gap Sample Phrasings
   const gapPhrasings = [
@@ -262,6 +316,15 @@ export const ResumeBuilder = () => {
               {completeness}%
             </span>
           </div>
+
+          <Button
+            variant="outline"
+            onClick={handleSaveResume}
+            isLoading={isSaving}
+            className="shadow-soft-sm font-semibold"
+          >
+            Save Resume
+          </Button>
 
           <Button
             variant="primary"
@@ -413,7 +476,7 @@ export const ResumeBuilder = () => {
                 <Button
                   variant="primary"
                   size="sm"
-                  onClick={() => setIsGapModalOpen(true)}
+                  onClick={handleOpenGapModal}
                   leftIcon={<Sparkles className="w-3.5 h-3.5" />}
                   className="text-xs"
                 >
@@ -1002,28 +1065,42 @@ export const ResumeBuilder = () => {
         }
       >
         <div className="space-y-3">
-          {gapPhrasings.map((gp, i) => (
-            <div
-              key={i}
-              className="p-4 rounded-2xl border border-surface-border hover:border-primary-400 hover:bg-primary-50/30 transition-all space-y-2 cursor-pointer group"
-              onClick={() => handleApplyGapPhrasing(gp.text)}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-heading font-bold text-sm text-ink group-hover:text-primary-700">
-                  {gp.title}
-                </span>
-                <Badge variant="primary" size="sm">
-                  {gp.badge}
-                </Badge>
-              </div>
-              <p className="text-xs text-ink-muted leading-relaxed">"{gp.text}"</p>
-              <div className="flex justify-end pt-1">
-                <span className="text-xs font-bold text-primary-600 group-hover:underline">
-                  Apply This Statement →
-                </span>
-              </div>
+          {aiGapDemoMode && (
+            <div className="mb-2">
+              <Badge variant="demo" size="sm">
+                Demo mode • AI positive phrasing
+              </Badge>
             </div>
-          ))}
+          )}
+          {aiGapLoading ? (
+            <div className="py-8 text-center text-xs text-ink-muted flex items-center justify-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary-500 animate-spin" />
+              <span>Generating positive gap statements with AI...</span>
+            </div>
+          ) : (
+            (fetchedGapPhrasings.length > 0 ? fetchedGapPhrasings : gapPhrasings).map((gp, i) => (
+              <div
+                key={i}
+                className="p-4 rounded-2xl border border-surface-border hover:border-primary-400 hover:bg-primary-50/30 transition-all space-y-2 cursor-pointer group"
+                onClick={() => handleApplyGapPhrasing(gp.text)}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-heading font-bold text-sm text-ink group-hover:text-primary-700">
+                    {gp.title || gp.style}
+                  </span>
+                  <Badge variant="primary" size="sm">
+                    {gp.badge || gp.style || 'AI Phrasing'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-ink-muted leading-relaxed">"{gp.text}"</p>
+                <div className="flex justify-end pt-1">
+                  <span className="text-xs font-bold text-primary-600 group-hover:underline">
+                    Apply This Statement →
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </Modal>
     </div>

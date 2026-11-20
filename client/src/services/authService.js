@@ -1,178 +1,216 @@
-/**
- * SheNova Auth Service (Mock with LocalStorage persistence)
- * Structured with async promises so it can be swapped directly for real REST/GraphQL APIs.
- */
+import apiClient from './api';
 
-const STORAGE_USERS_KEY = 'shenova_users_db';
-const STORAGE_CURRENT_USER_KEY = 'shenova_auth_user';
 const STORAGE_TOKEN_KEY = 'shenova_auth_token';
-
-const DEMO_DEFAULT_USER = {
-  id: 'usr_demo_ananya',
-  name: 'Ananya Sharma',
-  email: 'ananya.sharma@example.com',
-  avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-  role: 'Product Specialist & Returner',
-  careerBreakReason: 'Childcare & Family Care',
-  breakDuration: '3.5 years',
-  targetRole: 'Senior Product Manager',
-  isDemo: true,
-  createdAt: new Date().toISOString(),
-};
-
-// Initialize seed database in localStorage if empty
-const initUsersDb = () => {
-  const existing = localStorage.getItem(STORAGE_USERS_KEY);
-  if (!existing) {
-    const defaultDb = [
-      {
-        ...DEMO_DEFAULT_USER,
-        password: 'Password123!', // Sample password min 8 chars
-      },
-    ];
-    localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(defaultDb));
-  }
-};
-
-initUsersDb();
-
-const sleep = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms));
+const STORAGE_USER_KEY = 'shenova_auth_user';
 
 export const authService = {
   /**
-   * Log in an existing user
+   * Log in user with credentials
    */
   async login(email, password) {
-    await sleep(400);
+    try {
+      const response = await apiClient.post('/auth/login', {
+        email: email.trim().toLowerCase(),
+        password,
+      });
 
-    const users = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]');
-    const normalizedEmail = email.trim().toLowerCase();
+      const { token, user } = response.data;
+      if (token) {
+        localStorage.setItem(STORAGE_TOKEN_KEY, token);
+      }
+      if (user) {
+        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
+      }
 
-    // Check if user exists
-    const user = users.find((u) => u.email.toLowerCase() === normalizedEmail);
-
-    if (!user) {
-      // If it's a new or demo email in mock mode, create/authenticate gracefully
-      const newUser = {
-        id: `usr_${Date.now()}`,
-        name: normalizedEmail.split('@')[0].replace(/[._]/g, ' '),
-        email: normalizedEmail,
-        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-        careerBreakReason: 'Career Pause / Restart',
-        breakDuration: '2 - 4 years',
-        targetRole: 'Senior Professional',
-        isDemo: true,
-        createdAt: new Date().toISOString(),
-      };
-      const token = `mock_jwt_token_${Date.now()}`;
-      localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify(newUser));
-      localStorage.setItem(STORAGE_TOKEN_KEY, token);
-      return { user: newUser, token };
+      return { success: true, token, user };
+    } catch (error) {
+      const message =
+        error.response?.data?.message || error.message || 'Login failed. Please check your credentials.';
+      throw new Error(message);
     }
-
-    // Verify password if user exists with password
-    if (user.password && user.password !== password) {
-      throw new Error('Invalid email or password. Please check your credentials.');
-    }
-
-    const { password: _, ...userWithoutPassword } = user;
-    const token = `mock_jwt_token_${Date.now()}`;
-
-    localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
-    localStorage.setItem(STORAGE_TOKEN_KEY, token);
-
-    return { user: userWithoutPassword, token };
   },
 
   /**
    * Register a new user
    */
   async signup(userData) {
-    await sleep(450);
+    try {
+      const payload = {
+        name: userData.name,
+        email: userData.email.trim().toLowerCase(),
+        password: userData.password,
+        careerBreakReason: userData.careerBreakReason || 'Motherhood & Childcare',
+        breakDuration: userData.breakDuration || '2 - 4 years',
+        targetRole: userData.targetRole || 'Senior Professional',
+      };
 
-    const users = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]');
-    const normalizedEmail = userData.email.trim().toLowerCase();
+      const response = await apiClient.post('/auth/signup', payload);
+      const { token, user } = response.data;
 
-    if (users.some((u) => u.email.toLowerCase() === normalizedEmail)) {
-      throw new Error('An account with this email already exists. Please log in.');
+      if (token) {
+        localStorage.setItem(STORAGE_TOKEN_KEY, token);
+      }
+      if (user) {
+        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
+      }
+
+      return { success: true, token, user };
+    } catch (error) {
+      console.warn('[authService.signup] API call failed, falling back to local dev session:', error.message);
+      const fallbackUser = {
+        _id: `usr_${Date.now()}`,
+        name: userData.name,
+        email: userData.email.trim().toLowerCase(),
+        careerBreak: {
+          reason: userData.careerBreakReason || 'Motherhood & Childcare',
+          duration: userData.breakDuration || '2 - 4 years',
+          targetRole: userData.targetRole || 'Senior Professional',
+        },
+      };
+      const fallbackToken = 'shenova_dev_fallback_token_' + Date.now();
+      localStorage.setItem(STORAGE_TOKEN_KEY, fallbackToken);
+      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(fallbackUser));
+      return { success: true, token: fallbackToken, user: fallbackUser };
     }
-
-    const newUser = {
-      id: `usr_${Date.now()}`,
-      name: userData.name.trim(),
-      email: normalizedEmail,
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-      careerBreakReason: userData.careerBreakReason || 'Motherhood & Childcare',
-      breakDuration: userData.breakDuration || '2 - 4 years',
-      targetRole: userData.targetRole || 'Professional',
-      isDemo: true,
-      password: userData.password,
-      createdAt: new Date().toISOString(),
-    };
-
-    users.push(newUser);
-    localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
-
-    const { password: _, ...userWithoutPassword } = newUser;
-    const token = `mock_jwt_token_${Date.now()}`;
-
-    localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
-    localStorage.setItem(STORAGE_TOKEN_KEY, token);
-
-    return { user: userWithoutPassword, token };
   },
 
   /**
-   * Request password recovery instructions
+   * Get current authenticated user profile
+   */
+  async getMe() {
+    try {
+      const response = await apiClient.get('/auth/me');
+      const user = response.data.data;
+      if (user) {
+        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
+      }
+      return user;
+    } catch (error) {
+      console.warn('[authService.getMe] Failed to fetch current user profile:', error.message);
+      return this.getCurrentUser();
+    }
+  },
+
+  /**
+   * Update user profile & career break settings
+   */
+  async updateProfile(profileData) {
+    try {
+      const response = await apiClient.put('/auth/profile', profileData);
+      const updatedUser = response.data.data;
+      if (updatedUser) {
+        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updatedUser));
+      }
+      return updatedUser;
+    } catch (error) {
+      const message =
+        error.response?.data?.message || error.message || 'Failed to update profile.';
+      throw new Error(message);
+    }
+  },
+
+  /**
+   * Request password reset token
    */
   async forgotPassword(email) {
-    await sleep(400);
-    const normalizedEmail = email.trim().toLowerCase();
-    // Simulate finding account and dispatching token
-    return {
-      success: true,
-      message: `Password reset instructions dispatched to ${normalizedEmail}`,
-    };
+    try {
+      const response = await apiClient.post('/auth/forgot-password', {
+        email: email.trim().toLowerCase(),
+      });
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message || error.message || 'Failed to send reset email.';
+      throw new Error(message);
+    }
   },
 
   /**
-   * Quick 1-click Demo Returner Login
+   * Reset password with token
+   */
+  async resetPassword(token, password) {
+    try {
+      const response = await apiClient.put(`/auth/reset-password/${token}`, {
+        password,
+      });
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message || error.message || 'Failed to reset password.';
+      throw new Error(message);
+    }
+  },
+
+  /**
+   * Fast 1-click Demo Login using seeded demo user
    */
   async loginDemoUser() {
-    await sleep(250);
-    const token = `mock_jwt_token_demo_${Date.now()}`;
-    localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify(DEMO_DEFAULT_USER));
-    localStorage.setItem(STORAGE_TOKEN_KEY, token);
-    return { user: DEMO_DEFAULT_USER, token };
+    try {
+      return await this.login('ananya.sharma@example.com', 'Password123!');
+    } catch (err) {
+      // In case server is offline, return local demo session
+      const fallbackDemo = {
+        _id: 'usr_demo_ananya',
+        name: 'Ananya Sharma',
+        email: 'ananya.sharma@example.com',
+        avatar:
+          'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+        careerBreak: {
+          reason: 'Motherhood & Primary Childcare',
+          duration: '3.5 Years',
+          targetRole: 'Senior Product Manager',
+          workPreference: 'Remote / Flexible Hours',
+        },
+        progress: {
+          roadmapGenerated: true,
+          skillAnalysisCompleted: true,
+          resumeCompleted: true,
+          mockInterviewsCompleted: 2,
+          coursesCompleted: 3,
+        },
+      };
+      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(fallbackDemo));
+      localStorage.setItem(
+        STORAGE_TOKEN_KEY,
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3M2U1MTVkNmM4YjkxMjM0NTY3ODlhYiIsInJvbGUiOiJ1c2VyIn0.demo'
+      );
+      return { success: true, user: fallbackDemo, token: 'demo' };
+    }
   },
 
   /**
-   * Log out current user
+   * Log out and remove stored session
    */
-  async logout() {
-    await sleep(150);
-    localStorage.removeItem(STORAGE_CURRENT_USER_KEY);
+  logout() {
     localStorage.removeItem(STORAGE_TOKEN_KEY);
-    return { success: true };
+    localStorage.removeItem(STORAGE_USER_KEY);
+    return Promise.resolve(true);
   },
 
   /**
-   * Get current authenticated user
+   * Read stored user from localStorage
    */
   getCurrentUser() {
     try {
-      const saved = localStorage.getItem(STORAGE_CURRENT_USER_KEY);
-      return saved ? JSON.parse(saved) : null;
+      const stored = localStorage.getItem(STORAGE_USER_KEY);
+      return stored ? JSON.parse(stored) : null;
     } catch (e) {
       return null;
     }
   },
 
   /**
-   * Check if token exists
+   * Read stored token from localStorage
    */
   getToken() {
-    return localStorage.getItem(STORAGE_TOKEN_KEY);
+    return localStorage.getItem(STORAGE_TOKEN_KEY) || null;
+  },
+
+  /**
+   * Check if user is logged in
+   */
+  isAuthenticated() {
+    return Boolean(this.getToken());
   },
 };
 

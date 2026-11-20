@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authService } from '../services/authService';
 
 const AuthContext = createContext(null);
@@ -7,24 +7,54 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize auth state on mount
-  useEffect(() => {
+  const refreshUser = useCallback(async () => {
     try {
-      const currentUser = authService.getCurrentUser();
       const token = authService.getToken();
-      if (currentUser && token) {
-        setUser(currentUser);
-      } else {
-        // By default on initial load, provide the demo user so exploring without login works smoothly,
-        // or let's initialize if present in localStorage
-        setUser(currentUser);
+      if (token) {
+        const freshUser = await authService.getMe();
+        if (freshUser) {
+          setUser(freshUser);
+          return freshUser;
+        }
       }
     } catch (err) {
-      console.warn('Error reading auth state:', err);
-    } finally {
-      setIsLoading(false);
+      console.warn('Could not refresh user:', err.message);
     }
+    return null;
   }, []);
+
+  // Initialize auth state on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const currentUser = authService.getCurrentUser();
+        const token = authService.getToken();
+        if (currentUser && token) {
+          setUser(currentUser);
+          // Refresh from server in background
+          refreshUser();
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.warn('Error reading auth state:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Listen for 401 unauthorized broadcasts
+    const handleUnauthorized = () => {
+      setUser(null);
+    };
+
+    window.addEventListener('shenova:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('shenova:unauthorized', handleUnauthorized);
+    };
+  }, [refreshUser]);
 
   const login = async (email, password) => {
     setIsLoading(true);
@@ -73,13 +103,14 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: Boolean(user),
+        isAuthenticated: Boolean(user && authService.getToken()),
         isLoading,
         login,
         loginDemo,
         signup,
         logout,
         setUser,
+        refreshUser,
       }}
     >
       {children}

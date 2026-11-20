@@ -1,9 +1,4 @@
-/**
- * SheNova AI Mock Interview Service (Mock with realistic Gemini-style evaluations)
- * Structured with clean async signatures ready for Express / Gemini API integration.
- */
-
-const sleep = (ms = 500) => new Promise((resolve) => setTimeout(resolve, ms));
+import apiClient from './api';
 
 export const INTERVIEW_ROLES = [
   'Senior Product Manager',
@@ -23,139 +18,159 @@ export const DIFFICULTY_LEVELS = [
 
 export const interviewService = {
   /**
-   * Generates 5 tailored returner interview questions based on role and difficulty.
-   * @param {string} role
-   * @param {string} difficulty
-   * @returns {Promise<Array>}
+   * Starts a new session or generates questions
    */
   async generateQuestions(role = 'Senior Product Manager', difficulty = 'standard') {
-    await sleep(600);
+    try {
+      const response = await apiClient.post('/interview/start', { role, difficulty });
+      if (response.data?.success && response.data?.data) {
+        return {
+          sessionId: response.data.data._id,
+          questions: response.data.data.questions,
+          demoMode: Boolean(response.data.data.isDemo || response.data.demoMode),
+        };
+      }
+    } catch (error) {
+      console.warn('[interviewService.generateQuestions] API error, checking AI questions endpoint:', error.message);
+      try {
+        const aiResponse = await apiClient.post('/ai/interview-questions', { role, difficulty });
+        if (aiResponse.data?.success && aiResponse.data?.data?.questions) {
+          return {
+            sessionId: `sess_${Date.now()}`,
+            questions: aiResponse.data.data.questions,
+            demoMode: Boolean(aiResponse.data.demoMode),
+          };
+        }
+      } catch (aiErr) {}
+    }
 
-    return [
-      {
-        id: 1,
-        category: 'Career Gap Reframing',
-        question:
-          'Could you tell us about your career pause and how you maintained professional momentum and transferable leadership during this time?',
-        contextTip:
-          'Recruiters look for self-assurance, positive framing, and quantifiable self-directed learning.',
-        idealKeywords: ['resilience', 'triage', 'continuous learning', 'upskilling', 'family leadership'],
-      },
-      {
-        id: 2,
-        category: 'Technological & Tooling Agility',
-        question:
-          'Tools and workflows evolved rapidly in recent years. How have you updated your fluency with generative AI, modern cloud platforms, or current analytics stacks?',
-        contextTip:
-          'Cite specific hands-on sprints, courses, or micro-projects completed on SheNova or independently.',
-        idealKeywords: ['GenAI', 'automation', 'hands-on', 'modern workflows', 'agility'],
-      },
-      {
-        id: 3,
-        category: 'Cross-Functional Stakeholder Alignment',
-        question:
-          'Describe a situation where engineering, design, and business leadership had competing priorities. How did you negotiate alignment and drive execution?',
-        contextTip:
-          'Demonstrate structured decision frameworks and empathetic negotiation honed through real-world life experience.',
-        idealKeywords: ['prioritization', 'trade-offs', 'data-driven', 'consensus', 'clear communication'],
-      },
-      {
-        id: 4,
-        category: 'Work-Life Prioritization & Resilience',
-        question:
-          'Returning to the workforce requires orchestrating professional deliverables alongside personal commitments. How do you structure your focus and boundaries to prevent burnout?',
-        contextTip:
-          'Highlight asynchronous efficiency, calendar blocking, and proactive team communication.',
-        idealKeywords: ['asynchronous', 'boundaries', 'calendar blocking', 'proactive', 'ownership'],
-      },
-      {
-        id: 5,
-        category: 'Strategic Vision & Impact',
-        question:
-          'In your first 90 days in this returnship role, how will you identify high-leverage opportunities to deliver value while getting up to speed with the team?',
-        contextTip:
-          'Show a humble yet proactive 30-60-90 day orientation plan: Listen, Learn, Align, Deliver.',
-        idealKeywords: ['listen first', 'quick wins', 'stakeholder interviews', 'metrics', 'collaboration'],
-      },
-    ];
+    // Realistic Demo Fallback
+    return {
+      sessionId: `sess_${Date.now()}`,
+      demoMode: true,
+      questions: [
+        {
+          id: 1,
+          category: 'Career Gap Reframing',
+          question:
+            'Could you tell us about your career pause and how you maintained professional momentum and transferable leadership during this time?',
+          contextTip:
+            'Recruiters look for self-assurance, positive framing, and quantifiable self-directed learning.',
+          idealKeywords: ['resilience', 'triage', 'continuous learning', 'upskilling', 'family leadership'],
+        },
+        {
+          id: 2,
+          category: 'Technological & Tooling Agility',
+          question:
+            'Tools and workflows evolved rapidly in recent years. How have you updated your fluency with generative AI, modern cloud platforms, or current analytics stacks?',
+          contextTip:
+            'Cite specific hands-on sprints, courses, or micro-projects completed on SheNova or independently.',
+          idealKeywords: ['GenAI', 'automation', 'hands-on', 'modern workflows', 'agility'],
+        },
+        {
+          id: 3,
+          category: 'Cross-Functional Stakeholder Alignment',
+          question:
+            'Describe a situation where engineering, design, and business leadership had competing priorities. How did you negotiate alignment and drive execution?',
+          contextTip:
+            'Demonstrate structured decision frameworks and empathetic negotiation honed through real-world life experience.',
+          idealKeywords: ['prioritization', 'trade-offs', 'data-driven', 'consensus', 'clear communication'],
+        },
+        {
+          id: 4,
+          category: 'Prioritization Under Constraint',
+          question:
+            'How do you manage tight deadlines when team bandwidth is limited, and how do you protect team focus without compromising deliverables?',
+          contextTip:
+            'Highlight ruthless prioritization, transparent async communication, and realistic capacity planning.',
+          idealKeywords: ['Ruthless prioritization', 'async communication', 'boundary setting', 'scope management'],
+        },
+        {
+          id: 5,
+          category: 'Long-Term Impact & Growth',
+          question:
+            'Looking ahead at the next 12 to 18 months in this role, what is your approach to onboarding rapidly and driving measurable organizational impact?',
+          contextTip:
+            'Showcase a structured 30-60-90 day onboarding framework and eagerness to mentor peers.',
+          idealKeywords: ['30-60-90 plan', 'early wins', 'listening tour', 'mentorship', 'measurable impact'],
+        },
+      ],
+    };
   },
 
   /**
-   * Evaluates candidate response and returns multi-dimensional scoring and feedback.
-   * @param {Object} evaluationPayload
-   * @returns {Promise<Object>}
+   * Evaluates candidate's answer
    */
-  async evaluateAnswer({ question, answer, role, difficulty }) {
-    await sleep(750);
+  async evaluateAnswer({ question, answer, questionIndex = 0, sessionId, role = 'Senior Product Manager', difficulty = 'standard' }) {
+    if (sessionId && !sessionId.startsWith('sess_')) {
+      try {
+        const response = await apiClient.post(`/interview/sessions/${sessionId}/submit-answer`, {
+          questionIndex,
+          answer,
+        });
+        if (response.data?.success) {
+          return {
+            ...response.data.feedback,
+            demoMode: Boolean(response.data.session?.isDemo),
+          };
+        }
+      } catch (err) {
+        console.warn('[interviewService.evaluateAnswer] Session submit error, trying AI endpoint:', err.message);
+      }
+    }
 
+    try {
+      const aiResponse = await apiClient.post('/ai/evaluate-answer', {
+        question,
+        answer,
+        role,
+        difficulty,
+      });
+      if (aiResponse.data?.success && aiResponse.data?.data) {
+        return {
+          ...aiResponse.data.data,
+          demoMode: Boolean(aiResponse.data.demoMode),
+        };
+      }
+    } catch (err) {}
+
+    // Dynamic scoring calculation fallback
     const length = (answer || '').trim().length;
-
-    // Simulate realistic dynamic score based on depth and keywords
     const commScore = Math.min(95, Math.max(70, Math.round(75 + length / 35)));
     const relScore = Math.min(96, Math.max(72, Math.round(78 + length / 40)));
     const confScore = Math.min(92, Math.max(68, Math.round(74 + length / 45)));
 
     return {
+      demoMode: true,
       scores: {
         communication: commScore,
         relevance: relScore,
         confidence: confScore,
-        overall: Math.round((commScore + relScore + confScore) / 3),
       },
       strengths: [
-        'Clear, dignified tone that reframes pause commitments as active operational leadership.',
-        'Good structured flow from previous foundational expertise to recent upskilling initiatives.',
-        'Demonstrates genuine self-awareness without apologetic language.',
+        'Dignified, articulate framing of career pause responsibilities.',
+        'Good balance of prior foundational depth with recent learning sprints.',
+        'High degree of composure and clarity in delivery.',
       ],
       improvements: [
-        'Quantify your outcomes whenever possible (e.g., mention specific hour commitments or measurable project results).',
-        'Directly bridge your past successes to how they de-risk the hiring manager’s upcoming quarter.',
+        'Anchor your achievements with specific metrics or quantitative milestones.',
+        'Conclude with direct relevance to de-risking hiring managers deliverables.',
       ],
       suggestedAnswer:
-        '“During my 3.5-year career pause for family caregiving, I maintained dedicated 8-hour weekly learning sprints focused on Generative AI product flows and modern event analytics. Managing multi-stakeholder household operations sharpened my triage, crisis de-escalation, and budget discipline—qualities that directly complement my prior 5+ years of software delivery. I am eager to apply this synthesized perspective to accelerate your team’s 2026 roadmap.”',
+        '“During my 3.5-year career pause for family caregiving, I dedicated 8 hours weekly to AI product roadmapping and analytics certifications. Managing complex household operations sharpened my triage, crisis de-escalation, and budget discipline—qualities that directly complement my prior 5+ years of software delivery.”',
     };
   },
 
   /**
-   * Generates final interview report aggregating all questions.
+   * Fetch past interview sessions
    */
-  calculateReport(answersList = []) {
-    if (answersList.length === 0) return null;
-
-    const avgComm = Math.round(
-      answersList.reduce((acc, curr) => acc + (curr.feedback?.scores?.communication || 80), 0) /
-        answersList.length
-    );
-    const avgRel = Math.round(
-      answersList.reduce((acc, curr) => acc + (curr.feedback?.scores?.relevance || 82), 0) /
-        answersList.length
-    );
-    const avgConf = Math.round(
-      answersList.reduce((acc, curr) => acc + (curr.feedback?.scores?.confidence || 78), 0) /
-        answersList.length
-    );
-    const overallScore = Math.round((avgComm + avgRel + avgConf) / 3);
-
-    return {
-      overallScore,
-      scores: {
-        communication: avgComm,
-        relevance: avgRel,
-        confidence: avgConf,
-        technicalAgility: Math.round((avgRel + avgConf) / 2),
-      },
-      summary:
-        'Strong returner readiness. You demonstrated executive composure, articulated pause leadership with pride, and conveyed genuine motivation for returnship cohort onboarding.',
-      strengths: [
-        'Unapologetic reframing of career gap into tangible organizational strengths.',
-        'Strong grasp of contemporary collaboration tools and modern technology trends.',
-        'High empathy and maturity in handling cross-functional team friction.',
-      ],
-      growthAreas: [
-        'Practice tighter 60-second elevator summaries for the opening question.',
-        'Continue referencing specific metrics from your prior experience to establish instant credibility.',
-      ],
-    };
+  async getPastSessions() {
+    try {
+      const response = await apiClient.get('/interview/sessions');
+      return response.data?.data || [];
+    } catch (err) {
+      return [];
+    }
   },
 };
 
