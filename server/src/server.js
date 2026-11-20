@@ -11,6 +11,13 @@ import errorHandler from './middleware/errorHandler.js';
 
 // Route files
 import authRoutes from './routes/authRoutes.js';
+import roadmapRoutes from './routes/roadmapRoutes.js';
+import skillAnalysisRoutes from './routes/skillAnalysisRoutes.js';
+import resumeRoutes from './routes/resumeRoutes.js';
+import jobRoutes from './routes/jobRoutes.js';
+import interviewRoutes from './routes/interviewRoutes.js';
+import learningRoutes from './routes/learningRoutes.js';
+import communityRoutes from './routes/communityRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -80,6 +87,13 @@ app.get('/api/health', (req, res) => {
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/roadmap', roadmapRoutes);
+app.use('/api/skill-analysis', skillAnalysisRoutes);
+app.use('/api/resume', resumeRoutes);
+app.use('/api/jobs', jobRoutes);
+app.use('/api/interview', interviewRoutes);
+app.use('/api/learning', learningRoutes);
+app.use('/api/community', communityRoutes);
 
 // Catch-all for undefined routes
 app.use('*', (req, res) => {

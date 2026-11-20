@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 
+// Fast timeout when DB is unavailable so requests don't hang in dev
+mongoose.set('bufferTimeoutMS', 2500);
+
 export const connectDB = async () => {
   try {
     const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/shenova';
