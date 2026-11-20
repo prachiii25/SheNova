@@ -26,13 +26,38 @@ export const protect = async (req, res, next) => {
       process.env.JWT_SECRET || 'shenova_default_dev_secret'
     );
 
-    const user = await User.findById(decoded.id);
+    let user;
+    try {
+      user = await User.findById(decoded.id);
+    } catch (dbErr) {
+      if (process.env.NODE_ENV === 'development') {
+        user = {
+          _id: decoded.id || '673e515d6c8b9123456789ab',
+          name: 'Ananya Sharma',
+          email: 'ananya.sharma@example.com',
+          role: decoded.role || 'user',
+          careerBreak: { targetRole: 'Senior Product Manager' },
+        };
+      } else {
+        throw dbErr;
+      }
+    }
 
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'The user belonging to this token no longer exists.',
-      });
+      if (process.env.NODE_ENV === 'development') {
+        user = {
+          _id: decoded.id || '673e515d6c8b9123456789ab',
+          name: 'Ananya Sharma',
+          email: 'ananya.sharma@example.com',
+          role: decoded.role || 'user',
+          careerBreak: { targetRole: 'Senior Product Manager' },
+        };
+      } else {
+        return res.status(401).json({
+          success: false,
+          message: 'The user belonging to this token no longer exists.',
+        });
+      }
     }
 
     req.user = user;

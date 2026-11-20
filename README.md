@@ -230,6 +230,21 @@ Demo User Credentials:
 
 ---
 
+### Google Gemini AI Engine (`/api/ai`)
+*Powered by official `@google/genai` SDK with `GEMINI_API_KEY` and configurable `GEMINI_MODEL` (defaults to `gemini-2.5-flash`). Returns fallback demo responses with `demoMode: true` if API key is unconfigured, times out, or fails.*
+
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/ai/roadmap` | Protected | Generates 60-day personalized career restart roadmap with milestones & skills |
+| `POST` | `/api/ai/skill-gap` | Protected | Compares retained skills vs contemporary 2025/2026 role requirements & sprint plan |
+| `POST` | `/api/ai/improve-resume` | Protected | Optimizes resume bullets with active leadership verbs & ATS keywords |
+| `POST` | `/api/ai/explain-gap` | Protected | Generates 3 positive career gap framings (Executive, Direct, Growth-oriented) |
+| `POST` | `/api/ai/interview-questions` | Protected | Generates 5 realistic scenario interview questions with context tips & keywords |
+| `POST` | `/api/ai/evaluate-answer` | Protected | Evaluates communication, relevance, confidence; returns model answer |
+| `POST` | `/api/ai/recommend-courses` | Protected | Recommends targeted modern micro-courses closing identified skill deltas |
+
+---
+
 ## 🔒 Data Isolation & Sample Data Rules
 
 1. **User Scoping:** Every protected endpoint strictly filters queries by `user: req.user._id`. Users cannot view, modify, or delete another user's roadmap, resume, applications, interview sessions, or mentorship requests.

@@ -18,6 +18,7 @@ import jobRoutes from './routes/jobRoutes.js';
 import interviewRoutes from './routes/interviewRoutes.js';
 import learningRoutes from './routes/learningRoutes.js';
 import communityRoutes from './routes/communityRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -94,6 +95,7 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/learning', learningRoutes);
 app.use('/api/community', communityRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Catch-all for undefined routes
 app.use('*', (req, res) => {
