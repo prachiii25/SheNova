@@ -5,9 +5,10 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n \"server,client\" -c \"magenta,cyan\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
-    "start": "concurrently -n \"server,client\" -c \"magenta,cyan\" \"npm start --prefix server\" \"npm run preview --prefix client\"",
+    "start": "node server/src/server.js",
     "build": "npm run build --prefix client",
-    "seed": "npm run seed --prefix server",
+    "postinstall": "npm install --prefix server && npm install --prefix client",
+    "seed": "node server/src/seed.js",
     "install:all": "npm install && npm install --prefix server && npm install --prefix client"
   },
   "devDependencies": {
